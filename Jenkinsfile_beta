@@ -1,0 +1,37 @@
+node {
+    def app
+    def project = "sl-event-beta"
+    def builder = "${currentBuild.getBuildCauses()[0].shortDescription} / ${currentBuild.getBuildCauses()[0].userId}"
+    echo "PROJECT: ${project}"
+    echo "BUILDER: ${builder}"
+    echo "VERSION: ${env.VERSION}"
+
+    stage('Clone repository') {
+        checkout scm
+    }
+
+    stage('Build image') {
+        String currentDirectory = pwd()
+        sh "sed -i 's+VERSION=.*+VERSION=${env.VERSION}+g' /var/jenkins_home/env/sl-event/env.beta"
+        sh "echo current directory = ${currentDirectory}"
+        sh "cp /var/jenkins_home/env/sl-event/env.beta ${currentDirectory}/"
+        app = docker.build("ow-tcr.tencentcloudcr.com/ow-tke-tcr/${project}", "--build-arg NODE_ENV=beta --build-arg PROJECT=${project} .")
+    }
+
+    stage('Test image') {
+        app.inside {
+            sh 'echo "-----------Tests passed----------------"'
+        }
+    }
+
+    stage('Push image') {
+        docker.withRegistry('http://ow-tcr.tencentcloudcr.com', 'tencent-tcr') {
+            app.push("${env.VERSION}")
+        }
+    }
+
+    stage('Trigger ManifestUpdate') {
+        echo "triggering update-manifest job"
+        build job: 'update-manifest', parameters: [string(name: 'VERSION', value: env.VERSION), string(name: 'BUILDER', value: builder)]
+    }
+}
