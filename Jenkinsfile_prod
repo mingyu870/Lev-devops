@@ -6,32 +6,58 @@ node {
     echo "BUILDER: ${builder}"
     echo "VERSION: ${env.VERSION}"
 
-    stage('Clone repository') {
-        checkout scm
-    }
-
-    stage('Build image') {
-        String currentDirectory = pwd()
-        sh "sed -i 's+VERSION=.*+VERSION=${env.VERSION}+g' /var/jenkins_home/env/sl-event/env.prod"
-        sh "echo current directory = ${currentDirectory}"
-        sh "cp /var/jenkins_home/env/sl-event/env.prod ${currentDirectory}/"
-        app = docker.build("ow-tcr.tencentcloudcr.com/ow-tke-tcr/${project}", "--build-arg NODE_ENV=prod --build-arg PROJECT=${project} .")
-    }
-
-    stage('Test image') {
-        app.inside {
-            sh 'echo "-----------Tests passed----------------"'
+    notifyBuild('STARTED', project, builder)
+try {
+        stage('Clone repository') {
+            checkout scm
         }
-    }
 
-    stage('Push image') {
-        docker.withRegistry('http://ow-tcr.tencentcloudcr.com', 'tencent-tcr') {
-            app.push("${env.VERSION}")
+        stage('Build image') {
+            String currentDirectory = pwd()
+            sh "sed -i 's+VERSION=.*+VERSION=${env.VERSION}+g' /var/jenkins_home/env/sl-event/env.prod"
+            sh "echo current directory = ${currentDirectory}"
+            sh "cp /var/jenkins_home/env/sl-event/env.prod ${currentDirectory}/"
+            app = docker.build("ow-tcr.tencentcloudcr.com/ow-tke-tcr/${project}", "--build-arg NODE_ENV=prod --build-arg PROJECT=${project} .")
         }
-    }
 
-    stage('Trigger ManifestUpdate') {
-        echo "triggering update-manifest job"
-        build job: 'update-manifest', parameters: [string(name: 'VERSION', value: env.VERSION), string(name: 'BUILDER', value: builder)]
+        stage('Test image') {
+            app.inside {
+                sh 'echo "-----------Tests passed----------------"'
+            }
+        }
+
+        stage('Push image') {
+            docker.withRegistry('http://ow-tcr.tencentcloudcr.com', 'tencent-tcr') {
+                app.push("${env.VERSION}")
+            }
+        }
+
+        stage('Trigger ManifestUpdate') {
+            echo "triggering update-manifest job"
+            build job: 'update-manifest', parameters: [string(name: 'VERSION', value: env.VERSION), string(name: 'BUILDER', value: builder)]
+        }
+
+        currentBuild.result = 'SUCCESS'
+    } catch (Exception e) {
+        currentBuild.result = 'FAILURE'
+        throw e
+    } finally {
+        notifyBuild(currentBuild.result, project, builder)
+    }
+}
+
+def notifyBuild(String buildStatus, String project, String builder) {
+    buildStatus = buildStatus ?: 'UNKNOWN'
+    def message = "*Project:* ${project}\n*Builder:* ${builder}\n*Version:* ${env.VERSION}\n*Status:* ${buildStatus}"
+
+    if (buildStatus == 'STARTED') {
+        // 빌드 시작 알림
+        slackSend(channel: '#25_cicd_alarm', color: 'warning', message: "Build started for ${project} by ${builder}")
+    } else if (buildStatus == 'SUCCESS') {
+        // 빌드 성공 알림
+        slackSend(channel: '#25_cicd_alarm', color: 'good', message: message)
+    } else if (buildStatus == 'FAILURE') {
+        // 빌드 실패 알림
+        slackSend(channel: '#25_cicd_alarm', color: 'danger', message: message)
     }
 }
