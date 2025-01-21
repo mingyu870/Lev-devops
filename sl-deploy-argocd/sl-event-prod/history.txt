@@ -1,9 +1,1 @@
-TIMESTAMP: 2025-01-21 16:36:34 (KST +0900), VERSION: 0.0.16, BUILD_NUMBER: 2, BUILDER: Started by user owbuilder / owjenkins
-TIMESTAMP: 2025-01-21 16:45:19 (KST +0900), VERSION: 0.0.17, BUILD_NUMBER: 3, BUILDER: Started by user owbuilder / owjenkins
-TIMESTAMP: 2025-01-21 16:55:24 (KST +0900), VERSION: 0.0.18, BUILD_NUMBER: 4, BUILDER: Started by user owbuilder / owjenkins
-TIMESTAMP: 2025-01-21 16:58:14 (KST +0900), VERSION: 0.0.19, BUILD_NUMBER: 5, BUILDER: Started by user owbuilder / owjenkins
-TIMESTAMP: 2025-01-21 17:11:04 (KST +0900), VERSION: 0.0.20, BUILD_NUMBER: 6, BUILDER: Started by user owbuilder / owjenkins
-TIMESTAMP: 2025-01-21 17:15:04 (KST +0900), VERSION: 0.0.21, BUILD_NUMBER: 7, BUILDER: Started by user owbuilder / owjenkins
-TIMESTAMP: 2025-01-21 17:20:04 (KST +0900), VERSION: 0.0.22, BUILD_NUMBER: 8, BUILDER: Started by user owbuilder / owjenkins
-TIMESTAMP: 2025-01-21 17:42:14 (KST +0900), VERSION: 0.0.23, BUILD_NUMBER: 9, BUILDER: Started by user owbuilder / owjenkins
-TIMESTAMP: 2025-01-21 17:53:55 (KST +0900), VERSION: 0.0.24, BUILD_NUMBER: 10, BUILDER: Started by user owbuilder / owjenkins
+delete
