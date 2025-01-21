@@ -1,0 +1,46 @@
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
+
+node {
+    def app
+    echo "BUILDER: ${env.BUILDER}"
+    echo "VERSION: ${env.VERSION}"
+    def TARGET = "sl-event-prod"
+
+    stage('Clone repository') {
+        checkout scm
+    }
+
+    stage('Update GIT') {
+        script {
+            try {
+                def date = new Date()
+                def dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss (z Z)")
+                def time = TimeZone.getTimeZone("Asia/Seoul")
+                dateFormat.setTimeZone(time)
+                today = dateFormat.format(date)
+                echo today
+
+                withCredentials([usernamePassword(credentialsId: 'dev-git', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
+                    sh "git config user.email admin@otherworld.network"
+                    sh "git config user.name otherworldnetwork"
+                    sh "cat './${TARGET}/deployment.yaml'"
+                    sh "sed -i 's+${TARGET}:.*+${TARGET}:${VERSION}+g' './${TARGET}/deployment.yaml'"
+                    sh "cat './${TARGET}/deployment.yaml'"
+                    sh "echo 'TIMESTAMP: ${today}, VERSION: ${VERSION}, BUILD_NUMBER: ${env.BUILD_NUMBER}, BUILDER: ${BUILDER}' >> './${TARGET}/history.txt'"
+                    sh "git add ."
+                    sh "git commit -m 'Deploy Complete [${TARGET}]: ${env.BUILD_NUMBER}'"
+                    sh "git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ow-develop/sl-deploy-tencent.git HEAD:master"
+                }
+            } catch (err) {
+                def errMsg = err.toString()
+
+                echo errMsg
+
+                throw err
+            }
+        }
+    }
+}
