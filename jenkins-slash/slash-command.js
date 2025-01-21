@@ -7,10 +7,10 @@ const app = express();
 const port = 3001;
 
 // Jenkins CLI 기본 URL 및 인증 정보 설정
-const jenkinsCliCommand = 'java -jar jenkins-cli.jar -s http://43.155.143.149:8080 -auth owjenkins:11da2374f2fcdc1aab4547c8b09687647f';
+const jenkinsCliCommand = 'java -jar jenkins-cli.jar -s http://ip:8080 -auth ID:auth';
 
 // Slack Webhook URL (Slack 로그 메시지를 전송할 URL)
-const slackWebhookUrl = 'https://hooks.slack.com/services/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';
+const slackWebhookUrl = 'webhook';
 
 app.use(bodyParser.urlencoded({ extended: true }));
 
