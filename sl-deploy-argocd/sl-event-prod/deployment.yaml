@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sl-event-prod
+  namespace: default
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: sl-event-prod
+  template:
+    metadata:
+      labels:
+        app: sl-event-prod
+    spec:
+      serviceAccountName: sl-event-prod
+      containers:
+      - name: sl-event-prod
+        image: ow-tcr.tencentcloudcr.com/ow-tke-tcr/sl-event-prod:0.0.24
+        imagePullSecrets:
+          - name: ow-tcr
+      - name: proxy
+        image: bitnami/kubectl:1.21.3
+        args:
+          - proxy
+          - --port=8001
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sl-event-prod
+  namespace: default
+imagePullSecrets:
+  - name: ow-tcr
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sl-event-prod
+rules:
+- apiGroups: ["", "events.k8s.io"]
+  resources: ["events"]
+  verbs: ["get", "watch", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: read-secrets-global
+subjects:
+- kind: ServiceAccount
+  name: sl-event-prod
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: sl-event-prod
+  apiGroup: rbac.authorization.k8s.io
