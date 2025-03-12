@@ -1,0 +1,12 @@
+# Node.js
+npm-debug.log
+dist/
+
+.env
+
+# Docker
+*.log
+
+# Kubernetes 설정 파일이 로컬에만 있을 경우
+*.yaml
+
