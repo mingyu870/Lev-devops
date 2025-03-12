@@ -1,0 +1,40 @@
+trivyOperator:
+  scan:
+    namespaces:
+      - default
+
+  image:
+    repository: aquasec/trivy
+    tag: 0.23.0
+
+  scanTargets:
+    - kind: Pod
+      name: "sl-*"
+
+    - kind: Service
+      name: "sl-*"
+
+  report:
+    format: json
+    outputPath: /root/trivy/trivy-reports/trivy-report-$(date +'%Y-%m-%d').json
+
+  extraContainers:
+    - name: trivy-init
+      image: busybox:1.35
+      command: ["sh", "-c", "touch /root/trivy/trivy-reports/trivy-report-$(date +'%Y-%m-%d').json"]
+      volumeMounts:
+        - mountPath: /root
+          name: trivy-reports-volume
+
+  volumes:
+    - name: trivy-reports-volume
+      emptyDir: {}
+
+
+  resources:
+    limits:
+      memory: "4Gi" 
+      cpu: "2"        
+    requests:
+      memory: "2Gi"   
+      cpu: "1" 
