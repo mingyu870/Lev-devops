@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: beta-sl-main-api
+  namespace: argocd  
+spec:
+  project: default 
+  source:
+    repoURL: https://gittoken@github.com/ow-develop/sl-deploy-tencent.git
+    targetRevision: HEAD 
+    path: sl-main-api-beta 
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated: 
+      prune: true  
+      selfHeal: true 
+
+
+
+
