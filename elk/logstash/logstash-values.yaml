@@ -1,0 +1,109 @@
+# logstash-yalues.yaml
+---
+replicas: 1
+
+logstashConfig:
+  logstash.yml: |
+    http.host: 0.0.0.0
+    xpack.monitoring.enabled: true
+    xpack.monitoring.elasticsearch.username: elastic
+    xpack.monitoring.elasticsearch.password: r5aha9hK839ooXHc
+    xpack.monitoring.elasticsearch.hosts: ["https://elasticsearch-master:9200"]
+    xpack.monitoring.elasticsearch.ssl.certificate_authority: "/usr/share/logstash/ca.crt"
+    xpack.monitoring.elasticsearch.ssl.verification_mode: none
+    xpack.monitoring.elasticsearch.sniffing: true
+
+logstashPipeline:
+  logstash.conf: |
+    input {
+      beats {
+        port => 5044
+        host => "0.0.0.0"
+        ssl => false
+      }
+    }
+    filter {
+      # Error, Debug, Log Level Processing
+      if [message] =~ /ERROR/ {
+        mutate {
+          add_field => { "log.level" => "ERROR" }
+        }
+      } else if [message] =~ /DEBUG/ {
+        mutate {
+          add_field => { "log.level" => "DEBUG" }
+        }
+      } else if [message] =~ /LOG/ {
+        mutate {
+          add_field => { "log.level" => "LOG" }
+        }
+      }
+      
+      # Additional Grok pattern (if needed)
+      grok {
+        match => { "message" => "%{COMBINEDAPACHELOG}" }
+      }
+    }
+    output {
+      elasticsearch {
+        hosts => ["https://elasticsearch-master:9200"]
+        index => "logstash-%{+YYYY.MM.dd}"
+        user => "elastic"
+        password => "r5aha9hK839ooXHc"
+        ssl => true
+        cacert => "/usr/share/logstash/ca.crt"
+        ssl_certificate_verification => true
+      }
+      stdout {
+        codec => rubydebug
+      }
+    }
+
+image: "docker.elastic.co/logstash/logstash"
+imageTag: "8.5.1"
+imagePullPolicy: "IfNotPresent"
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "1000m"
+    memory: "3Gi"
+
+tolerations:
+  - key: "node-role"
+    operator: "Equal"
+    value: "log-processor"
+    effect: "NoSchedule"
+
+service:
+  type: ClusterIP
+  ports:
+    - name: beats
+      port: 5044
+      protocol: TCP
+      targetPort: 5044
+    - name: http
+      port: 9600
+      protocol: TCP
+      targetPort: 9600
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+secretMounts:
+  - name: elasticsearch-certs
+    secretName: logstash-ca
+    path: /usr/share/logstash/ca.crt
+    subPath: ca.crt

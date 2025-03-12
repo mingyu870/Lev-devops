@@ -1,0 +1,53 @@
+# elastic-values.yaml
+clusterName: "elasticsearch"
+nodeGroup: "master"
+
+roles:
+  - master
+  - ingest
+  - data
+  - remote_cluster_client
+  - ml
+
+replicas: 1
+minimumMasterNodes: 1
+
+protocol: https
+httpPort: 9200
+imagePullPolicy: "IfNotPresent"
+
+extraEnvs: []
+
+esConfig:
+  elasticsearch.yml: |
+    xpack.security.enabled: "true"
+    xpack.security.transport.ssl.enabled: "true"
+    xpack.security.transport.ssl.supported_protocols: "TLSv1.2"
+    xpack.security.transport.ssl.client_authentication: "none"
+    xpack.security.transport.ssl.key: "/usr/share/elasticsearch/config/certs/tls.key"
+    xpack.security.transport.ssl.certificate: "/usr/share/elasticsearch/config/certs/tls.crt"
+    xpack.security.transport.ssl.certificate_authorities: "/usr/share/elasticsearch/config/certs/ca.crt"
+    xpack.security.transport.ssl.verification_mode: "certificate"
+    xpack.security.http.ssl.enabled: "true"
+    xpack.security.http.ssl.supported_protocols: "TLSv1.2"
+    xpack.security.http.ssl.client_authentication: "none"
+    xpack.security.http.ssl.key: "/usr/share/elasticsearch/config/certs/tls.key"
+    xpack.security.http.ssl.certificate: "/usr/share/elasticsearch/config/certs/tls.crt"
+    xpack.security.http.ssl.certificate_authorities: "/usr/share/elasticsearch/config/certs/ca.crt"
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "1Gi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+volumeClaimTemplate:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: "nfs-client"
+  resources:
+    requests:
+      storage: 500Gi
+
+clusterHealthCheckParams: "wait_for_status=yellow&timeout=2s"
