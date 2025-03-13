@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    meta.helm.sh/release-name: falco
+    meta.helm.sh/release-namespace: falco
+    prometheus.io/scrape: "true"
+  creationTimestamp: "2025-03-07T04:06:56Z"
+  labels:
+    app.kubernetes.io/component: core
+    app.kubernetes.io/instance: falco
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: falcosidekick
+    app.kubernetes.io/part-of: falcosidekick
+    app.kubernetes.io/version: 2.31.1
+    helm.sh/chart: falcosidekick-0.9.11
+  name: falco-falcosidekick
+  namespace: falco
+  resourceVersion: "12817818645"
+  uid: 1d12b616-bec6-4448-be14-367f44ebbaf2
+spec:
+  clusterIP: 172.16.253.217
+  clusterIPs:
+  - 172.16.253.217
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http
+    port: 2801
+    protocol: TCP
+    targetPort: http
+  - name: http-notls
+    port: 2810
+    protocol: TCP
+    targetPort: http-notls
+  selector:
+    app.kubernetes.io/component: core
+    app.kubernetes.io/instance: falco
+    app.kubernetes.io/name: falcosidekick
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

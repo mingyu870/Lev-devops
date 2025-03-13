@@ -1,0 +1,80 @@
+- rule: "Suspicious access to /etc/shadow"
+  desc: "Detects attempts to read /etc/shadow, which is often used in privilege escalation attacks."
+  condition: >
+    evt.type in (open, openat) and
+    fd.name = /etc/shadow
+  output: "Suspicious access to /etc/shadow by user=%user.name"
+  priority: WARNING
+
+- rule: "Suspicious network connections"
+  desc: "Detects unusual network connections that might indicate an attack or unauthorized access."
+  condition: >
+    evt.type = connect and
+    (fd.sip != 127.0.0.1 and fd.sip != ::1)
+  output: "Suspicious network connection detected from %fd.sip to %fd.dip"
+  priority: WARNING
+
+- rule: "Access to sensitive directories"
+  desc: "Detects access to directories that should not be accessed by unprivileged users."
+  condition: >
+    evt.type in (open, openat) and
+    fd.name in (/etc, /var/log, /root, /home/*/secret)
+  output: "Access to sensitive directory: %fd.name by user=%user.name"
+  priority: WARNING
+
+- rule: "Privilege escalation attempt"
+  desc: "Detects attempts to execute binaries that can be used for privilege escalation."
+  condition: >
+    evt.type in (execve) and
+    proc.exepath in (/usr/bin/sudo, /usr/bin/su, /usr/bin/pkexec)
+  output: "Privilege escalation attempt detected: %proc.exepath executed by user=%user.name"
+  priority: CRITICAL
+
+- rule: "Suspicious file creation in /tmp"
+  desc: "Detects the creation of files in /tmp that could indicate an attacker trying to place a malicious file."
+  condition: >
+    evt.type = creat and
+    fd.name startswith /tmp/
+  output: "Suspicious file created in /tmp: %fd.name by user=%user.name"
+  priority: WARNING
+
+- rule: "Unexpected binary execution"
+  desc: "Detects the execution of binaries from unexpected paths, such as non-standard directories."
+  condition: >
+    evt.type in (execve) and
+    proc.exepath not in (/usr/bin, /bin, /usr/sbin, /sbin)
+  output: "Unexpected binary execution: %proc.exepath executed by user=%user.name"
+  priority: WARNING
+
+- rule: "Container escape attempt"
+  desc: "Detects potential container escape attempts by monitoring for the use of container escape techniques."
+  condition: >
+    evt.type in (execve) and
+    proc.exepath in (/usr/bin/docker, /usr/bin/runc)
+  output: "Container escape attempt detected: %proc.exepath executed by user=%user.name"
+  priority: CRITICAL
+
+- rule: "Suspicious file modification in system directories"
+  desc: "Detects the modification of critical system files in directories like /etc, /bin, /sbin."
+  condition: >
+    evt.type in (open, openat) and
+    fd.name in (/etc/passwd, /etc/shadow, /etc/sudoers)
+  output: "Suspicious file modification detected: %fd.name by user=%user.name"
+  priority: CRITICAL
+
+- rule: "New user added to the system"
+  desc: "Detects when a new user is added to the system, which can be a sign of a potential attacker."
+  condition: >
+    evt.type = execve and
+    proc.exepath = /usr/sbin/useradd
+  output: "New user added to the system: user=%user.name"
+  priority: WARNING
+
+- rule: "Suspicious process executed"
+  desc: "Detects the execution of suspicious processes that are commonly associated with attacks."
+  condition: >
+    evt.type = execve and
+    proc.exepath in (/bin/bash, /bin/sh, /usr/bin/python, /usr/bin/perl)
+  output: "Suspicious process executed: %proc.exepath by user=%user.name"
+  priority: WARNING
+
