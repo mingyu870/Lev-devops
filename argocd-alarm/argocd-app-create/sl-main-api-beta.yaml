@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default 
   source:
-    repoURL: https://gittoken@github.com/ow-develop/sl-deploy-tencent.git
+    repoURL: https://git-token/ow-develop/sl-deploy-tencent.git
     targetRevision: HEAD 
     path: sl-main-api-beta 
   destination:
