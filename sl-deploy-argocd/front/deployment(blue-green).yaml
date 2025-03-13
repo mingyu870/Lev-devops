@@ -1,92 +1,45 @@
-# Blue Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  labels:
-    app: sl-front-dev-blue
   name: sl-front-dev-blue
+  labels:
+    app: sl-front-dev
+    version: blue
 spec:
   replicas: 2
-  selector:
-    matchLabels:
-      app: sl-front-dev-blue
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-        maxSurge: 25%
-        maxUnavailable: 25%
   template:
     metadata:
       labels:
-        app: sl-front-dev-blue
+        app: sl-front-dev
+        version: blue
     spec:
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: app
-                operator: In
-                values:
-                - sl-front-dev-blue
-            topologyKey: "kubernetes.io/hostname"
       containers:
-        - image: ow-tcr.tencentcloudcr.com/ow-tke-tcr/sl-front-dev:0.0.463
-          name: sl-front-dev-blue
-          resources:
-            limits:
-              cpu: 0.5
+        - name: sl-front-dev
+          image: ow-tcr.tencentcloudcr.com/ow-tke-tcr/sl-front-dev:0.0.463
           ports:
             - containerPort: 3000
-      imagePullSecrets:
-        - name: ow-tcr     
-
 ---
-# Green Deployment (기존의 sl-front-dev Deployment)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  labels:
-    app: sl-front-dev-green
   name: sl-front-dev-green
+  labels:
+    app: sl-front-dev
+    version: green
 spec:
   replicas: 2
-  selector:
-    matchLabels:
-      app: sl-front-dev-green
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-        maxSurge: 25%
-        maxUnavailable: 25%
   template:
     metadata:
       labels:
-        app: sl-front-dev-green
+        app: sl-front-dev
+        version: green
     spec:
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: app
-                operator: In
-                values:
-                - sl-front-dev-green
-            topologyKey: "kubernetes.io/hostname"
       containers:
-        - image: ow-tcr.tencentcloudcr.com/ow-tke-tcr/sl-front-dev:0.0.462  # 기존 Green 버전 이미지
-          name: sl-front-dev-green
-          resources:
-            limits:
-              cpu: 0.5
+        - name: sl-front-dev
+          image: ow-tcr.tencentcloudcr.com/ow-tke-tcr/sl-front-dev:0.0.464
           ports:
-            - containerPort: 3000
-      imagePullSecrets:
-        - name: ow-tcr
-
+            - containerPort: 3001
 ---
-# Service (Blue/Green 트래픽 전환)
 apiVersion: v1
 kind: Service
 metadata:
@@ -96,5 +49,6 @@ spec:
     - port: 80
       targetPort: 3000
   selector:
-    app: sl-front-dev-blue  # 초기에는 Blue로 설정
+    app: sl-front-dev
+    version: blue  # Blue 버전으로 트래픽을 보내기 위해 "blue"로 설정
   type: NodePort
