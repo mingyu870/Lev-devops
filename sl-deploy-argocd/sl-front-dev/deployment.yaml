@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: sl-front-dev
+  name: sl-front-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sl-front-dev
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: sl-front-dev
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - sl-front-dev
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+        - image: ow-tcr.tencentcloudcr.com/ow-tke-tcr/sl-front-dev:0.0.463
+          name: sl-front-dev
+          resources:
+            limits:
+              cpu: 0.5
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: ow-tcr     
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sl-front-dev-service
+spec:
+  ports:
+    - port: 80
+      targetPort: 3000
+  selector:
+    app: sl-front-dev
+  type: NodePort

@@ -1,0 +1,73 @@
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
+
+node {
+    def app
+    echo "BUILDER: ${env.BUILDER}"
+    echo "VERSION: ${env.VERSION}"
+    boolean buildFailed = false
+    def TARGET = "sl-front-dev"
+
+    try {
+        stage('Clone repository') {
+            checkout scm
+        }
+
+        stage('Update GIT') {
+            script {
+                def date = new Date()
+                def dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss (z Z)")
+                def time = TimeZone.getTimeZone("Asia/Seoul")
+                dateFormat.setTimeZone(time)
+                today = dateFormat.format(date)
+                echo today
+
+                withCredentials([usernamePassword(credentialsId: 'dev-git', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
+                    sh "git config user.email admin@otherworld.network"
+                    sh "git config user.name otherworldnetwork"
+                    sh "cat './${TARGET}/deployment.yaml'"
+                    sh "sed -i 's+${TARGET}:.*+${TARGET}:${VERSION}+g' './${TARGET}/deployment.yaml'"
+                    sh "cat './${TARGET}/deployment.yaml'"
+                    sh "echo 'TIMESTAMP: ${today}, VERSION: ${VERSION}, BUILD_NUMBER: ${env.BUILD_NUMBER}, BUILDER: ${BUILDER}' >> './${TARGET}/history.txt'"
+                    sh "git add ."
+                    sh "git commit -m 'Deploy Complete [${TARGET}]: ${env.BUILD_NUMBER}'"
+                    sh "git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ow-develop/sl-deploy-tencent.git HEAD:master"
+                }
+            }
+        }
+    } catch (Exception e) {
+        buildFailed = true
+        echo "Build failed: ${e.getMessage()}"
+        error "Stopping pipeline due to error."
+    }
+
+    // Trigger ArgoCD Refresh only if the build succeeded
+    if (!buildFailed) {
+        stage('Trigger ArgoCD Refresh') {
+            script {
+                def argocdUrl = 'https://argo.otherworld.network'
+                def applicationName = 'dev-sl-front'
+                def argocdToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhcmdvY2QiLCJzdWIiOiJhZG1pbjphcGlLZXkiLCJuYmYiOjE3MzczNTQxMTEsImlhdCI6MTczNzM1NDExMSwianRpIjoiOTdiZmNhN2ItMzAyMy00MDI5LWJkNWEtYjUzYTJlMzdkMzNiIn0.0SvDt85ofwUZ4-vRJ3nZS9gBwNSzH5jHgH-LLPNItfc'
+
+                // Sync the application
+                try {
+                    echo "Syncing ArgoCD application: ${applicationName}"
+                    httpRequest(
+                        url: "${argocdUrl}/api/v1/applications/${applicationName}/sync",
+                        httpMode: 'POST',
+                        contentType: 'APPLICATION_JSON',
+                        customHeaders: [[name: 'Authorization', value: "Bearer ${argocdToken}"]],
+                        validResponseCodes: '200:299'
+                    )
+                    echo "Sync triggered successfully for application: ${applicationName}"
+                } catch (Exception e) {
+                    error "Failed to sync application: ${e.getMessage()}"
+                }
+            }
+        }
+    } else {
+        echo "Build failed. Skipping ArgoCD deployment."
+    }
+}
