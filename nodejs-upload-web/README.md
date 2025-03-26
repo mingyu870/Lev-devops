@@ -53,3 +53,6 @@ web-upload/
   - 요청에 따라 적절한 컨트롤러(`login.js` 등) 호출.
 
 ---
+
+참고 세션베이스 & JWT
+https://github.com/NamJongtae/nodejs/blob/main/%EC%B6%94%EA%B0%80%EC%9E%90%EB%A3%8C/Session%20%EB%A1%9C%EA%B7%B8%EC%9D%B8.md
