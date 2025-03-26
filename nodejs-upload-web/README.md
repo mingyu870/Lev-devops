@@ -1,6 +1,6 @@
 # 프로젝트 이름
 
-이 프로젝트는 간단한 Node.js 기반의 웹 애플리케이션으로, 사용자 인증 및 서버 관리 기능을 제공합니다. 주요 파일로는 `main.js`, `login.js`, `server.js`가 포함되어 있으며, 각각의 역할과 기능은 아래에 설명되어 있습니다.
+이 프로젝트는 간단한 Node.js 기반의 웹 애플리케이션으로, 사용자 인증 및 서버 관리 기능을 제공합니다. 
 
 ---
 
@@ -8,13 +8,25 @@
 
 📂 프로젝트 디렉토리 구조
 
-project-directory/
-├── 📄 main.js          : 애플리케이션의 진입점
-├── 📂 routes/          : 라우팅 및 컨트롤러 관련 파일
-│   ├── 📄 server.js    : 서버 설정 및 주요 라우팅 관리
-│   └── 📄 login.js     : 사용자 인증 처리
-├── 📄 package.json     : 프로젝트 의존성 및 스크립트 정의
-└── 📄 README.md        : 프로젝트 설명 파일
+### 디렉토리 내역 
+web-upload/
+│
+├── app.js                          # 서버 실행 
+├── src         
+│   ├── db 
+│   │   └── users.json              # 유저 
+│   ├── middleware
+│   │   └── auth-middleware.js      # 세션기반
+│   └── routes
+│       ├── users.json              # 로그인 유저 조회
+│       ├── login-router.js         # 로그인
+│       ├── logout-router.js        # 로그아웃
+│       ├── main.js                 # 로그인 페이지
+│       ├── check-login-router.js   # 로그인 세션 유지
+│       ├── upload.js               # upload 페이지
+│       ├── backupfile.js           # 백업파일 리스트
+│       └── user-router.js          #
+└── package.json  
 
 ---
 

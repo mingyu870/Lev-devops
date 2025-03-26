@@ -1,0 +1,29 @@
+{
+    "users": [
+      {
+        "email": "lev",
+        "password": "12312312@ow"
+      },
+      {
+        "email": "terry",
+        "password": "123123123@ow"
+      },
+      {
+        "email": "aesop",
+        "password": "123123@ow"
+      },
+      {
+        "email": "freddie",
+        "password": "12313@ow"
+      },
+      {
+        "email": "tyler",
+        "password": "12313@ow"
+      },
+      {
+        "email": "ben",
+        "password": "123123@ow"
+      }
+    ]
+  }
+  
