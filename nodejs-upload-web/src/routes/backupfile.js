@@ -1,187 +1,148 @@
 const express = require("express");
-const fs = require("fs-extra");
+const { exec } = require("child_process");
 const path = require("path");
-const axios = require("axios");
+const fs = require("fs");
+const moment = require("moment-timezone");
 
 const router = express.Router();
+
+// 원격 Jenkins 서버 정보
+const JENKINS_SERVER = "10.10.0.11";
 const BACKUP_FOLDER = "/var/jenkins_home/env_backups";
+const SSH_KEY = "/home/ow.pem";
+const REMOTE_USER = "root";
+const DOWNLOAD_LOG = "/var/jenkins_home/env_downloads.log"; // 다운로드 기록 파일
 
-// Slack 웹훅 URL
-const SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/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";
-
-// 허용된 IP 목록
-const ALLOWED_IPS = ["58.234.153.26"];
-const PASSWORD = "Bac!k#e9fi!e"; 
-const ALLOWED_USERS = ["lev", "terry", "aesop", "freddie", "tyler", "ben"];
-const LOG_FILE = "/var/jenkins_home/access_logs.txt"; 
-const OTP_PASS = "19283"; 
-
-// 백업 파일 목록 페이지 (패스워드 및 사용자명 입력을 요구하는 페이지)
+// ✅ 파일 및 폴더 목록 가져오기
 router.get("/", (req, res) => {
-  const clientIp = req.ip;
+  const currentPath = req.query.path ? path.join(BACKUP_FOLDER, req.query.path) : BACKUP_FOLDER;
+  const sshCommand = `ssh -i ${SSH_KEY} -q ${REMOTE_USER}@${JENKINS_SERVER} "ls ${currentPath}"`;
 
-  // 클라이언트 IP가 허용된 IP 목록에 있으면 사용자 이름만 입력받는 페이지로 이동
-  if (ALLOWED_IPS.includes(clientIp)) {
-    return res.send(`
-      <form action="/backupfile/verify-ip" method="POST">
-        <label for="username">사용자 이름:</label>
-        <input type="text" id="username" name="username" required>
-        <label for="otp">OTP:</label>
-        <input type="text" id="otp" name="otp" required>
-        <button type="submit">확인</button>
-      </form>
-    `);
-  }
-
-  // 다른 IP에서 접근하면 사용자명과 패스워드를 입력받는 페이지로 이동
-  res.send(`
-    <form action="/backupfile/verify" method="POST">
-      <label for="username">사용자 이름:</label>
-      <input type="text" id="username" name="username" required>
-      <label for="password">패스워드를 입력하세요:</label>
-      <input type="password" id="password" name="password" required>
-      <label for="otp">OTP:</label>
-      <input type="text" id="otp" name="otp" required>
-      <button type="submit">확인</button>
-    </form>
-  `);
-});
-
-// 허용된 IP에서 사용자명과 OTP 확인 후 백업 파일 목록 페이지
-router.post("/verify-ip", (req, res) => {
-  const { username, otp } = req.body;
-
-  // 사용자명 확인 및 OTP 확인
-  if (ALLOWED_USERS.includes(username) && otp === OTP_PASS) {
-    return showBackupFiles(req, res, username); // 유저명이 맞고 OTP가 일치하면 백업 파일 목록을 보여줌
-  } else {
-    return res.status(403).send("사용자 이름 또는 OTP가 올바르지 않습니다.");
-  }
-});
-
-// 허용되지 않은 IP에서 사용자명, 패스워드, OTP 확인 후 백업 파일 목록 페이지
-router.post("/verify", (req, res) => {
-  const { username, password, otp } = req.body;
-
-  // 사용자명, 패스워드 및 OTP 확인
-  if (ALLOWED_USERS.includes(username) && password === PASSWORD && otp === OTP_PASS) {
-    return showBackupFiles(req, res, username); // 패스워드와 사용자명, OTP가 맞으면 백업 파일 목록을 보여줌
-  } else {
-    return res.status(403).send("사용자 이름, 패스워드 또는 OTP가 올바르지 않습니다.");
-  }
-});
-
-// 백업 파일 목록을 보여주는 함수
-const showBackupFiles = (req, res, username) => {
-  const page = parseInt(req.query.page) || 1;
-  const ITEMS_PER_PAGE = 15; 
-
-  try {
-    // 백업 폴더에서 파일 목록 가져오기
-    let files = fs.readdirSync(BACKUP_FOLDER);
-
-    if (files.length === 0) {
-      return res.send(`
-        <button onclick="window.location.href='/server'">⬅️ 뒤로 가기</button>
-        <h2>📂 백업된 파일 목록</h2>
-        <p>백업된 파일이 없습니다.</p>
-      `);
+  exec(sshCommand, (error, stdout, stderr) => {
+    if (error) {
+      console.error(" SSH 실행 오류:", stderr);
+      return res.status(500).send(" 백업 파일을 불러오는 중 오류가 발생했습니다.");
     }
 
-    // 파일의 최종 수정 시간 기준으로 정렬
-    files = files
-      .map(file => ({
-        name: file,
-        time: fs.statSync(path.join(BACKUP_FOLDER, file)).mtimeMs, // 파일 최종 수정 시간(ms)
-      }))
-      .sort((a, b) => b.time - a.time) // 최신순 정렬
-      .map(file => file.name); // 정렬 후 파일 이름만 가져오기
+    const items = stdout
+      .trim()
+      .split("\n")
+      .map(name => ({
+        name,
+        isDirectory: !name.includes(".") // 확장자가 없으면 폴더로 간주
+      }));
 
-    // 최신 3개 파일 강조
-    const top3Files = files.slice(0, 3);
+    // ✅ 폴더 먼저 정렬 후 최신순 정렬
+    items.sort((a, b) => (a.isDirectory && !b.isDirectory ? -1 : b.isDirectory && !a.isDirectory ? 1 : 0));
 
-    // 페이지네이션 적용
-    const paginatedFiles = files.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-    const totalPages = Math.ceil(files.length / ITEMS_PER_PAGE);
+    // ✅ 페이지네이션 처리
+    const page = parseInt(req.query.page) || 1;
+    const itemsPerPage = 10;
+    const totalPages = Math.ceil(items.length / itemsPerPage);
+    const paginatedItems = items.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
-    // HTML 파일 목록 생성
-    const fileListHtml = paginatedFiles
-      .map(file => {
-        const isHighlighted = top3Files.includes(file);
-        return `<li><span style="color: ${isHighlighted ? 'red' : 'black'}; font-weight: ${isHighlighted ? 'bold' : 'normal'};">${file}</span> - <a href="/backupfile/download?file=${file}&user=${username}">📥 다운로드</a></li>`;
-      })
-      .join("");
+    // ✅ 다운로드 이력 불러오기
+    let downloadHistory = "<ul>";
+    if (fs.existsSync(DOWNLOAD_LOG)) {
+      const logs = fs.readFileSync(DOWNLOAD_LOG, "utf8").trim().split("\n").slice(-10).reverse();
+      downloadHistory += logs
+        .map(log => {
+          const [date, user, filename] = log.split(" | ");
+          return `<li><strong>${date}</strong> | ${user} | ${filename}</li>`;
+        })
+        .join("");
+    }
+    downloadHistory += "</ul>";
 
-    // ⬅페이지 이동 버튼
-    const prevPage = page > 1 ? `<button onclick="window.location.href='/backupfile?page=${page - 1}'">⬅️ 이전</button>` : "";
-    const nextPage = page < totalPages ? `<button onclick="window.location.href='/backupfile?page=${page + 1}'">다음 ➡️</button>` : "";
+    // ✅ 파일 및 폴더 리스트 HTML 생성
+    const fileListHTML = paginatedItems.map(item =>
+      item.isDirectory
+        ? `<li><a href="/backupfile?path=${encodeURIComponent(req.query.path ? req.query.path + '/' + item.name : item.name)}">${item.name}</a></li>`
+        : `<li>${item.name} <a href="/backupfile/download?path=${encodeURIComponent(req.query.path ? req.query.path + '/' + item.name : item.name)}"> 다운로드</a></li>`
+    ).join("");
 
-    // 최종 HTML 응답
+    // ✅ 현재 경로 표시 및 상위 폴더 이동 버튼
+    const currentPathDisplay = `<p>현재 경로: ${req.query.path || "Root"}</p>`;
+    const parentPath = req.query.path
+      ? `<button onclick="window.location.href='/backupfile?path=${encodeURIComponent(path.dirname(req.query.path))}'" class="back-btn">⬅ 상위 폴더</button>`
+      : "";
+
+    // ✅ 페이지네이션 UI
+    let paginationHTML = "";
+    if (totalPages > 1) {
+      paginationHTML = `<div class="pagination">`;
+      for (let i = 1; i <= totalPages; i++) {
+        paginationHTML += `<a href="/backupfile?path=${encodeURIComponent(req.query.path || "")}&page=${i}" class="${i === page ? 'active' : ''}">${i}</a>`;
+      }
+      paginationHTML += `</div>`;
+    }
+
+    // ✅ HTML 응답
     res.send(`
-      <button onclick="window.location.href='/server'">⬅️ 뒤로 가기</button>
-      <h2>📂 백업된 파일 목록</h2>
-      <ul>${fileListHtml}</ul>
-      <br>
-      ${prevPage} ${nextPage}
-      <script>
-        // 30초 후에 /session-expired 페이지로 리디렉션
-        setTimeout(function() {
-          window.location.href = '/session-expired';
-        }, 30000); // 30초 = 30000ms
-      </script>
+      <html>
+      <head>
+        <title>Jenkins 백업 리스트</title>
+        <style>
+          body { background-color: #000; color: white; font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 20px; }
+          .container { max-width: 700px; margin: 0 auto; padding: 15px; background: #222; border-radius: 10px; }
+          ul { list-style: none; padding: 0; margin: 0; }
+          li { padding: 8px; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center; }
+          li a { text-decoration: none; color: cyan; }
+                    .download { color: yellow; text-decoration: none; padding: 3px 8px; border: 1px solid yellow; border-radius: 5px; font-size: 14px; }
+          .download:hover { background-color: yellow; color: black; }
+          .pagination { margin-top: 10px; display: flex; justify-content: center; gap: 5px; }
+          .pagination a { color: white; padding: 5px 8px; text-decoration: none; border: 1px solid white; border-radius: 5px; font-size: 14px; }
+          .pagination a.active { font-weight: bold; color: red; border-color: red; }
+          .back-btn { margin: 10px 0; padding: 5px 10px; background: transparent; color: cyan; border: none; cursor: pointer; font-size: 14px; }
+          .close-btn { margin-top: 20px; background: transparent; color: white; border: none; cursor: pointer; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h2> env_backup list </h2>
+          ${currentPathDisplay}
+          ${parentPath}
+          <ul>${fileListHTML}</ul>
+          ${paginationHTML}
+          <h3>다운로드 이력</h3>
+          ${downloadHistory}
+          <button class="close-btn" onclick="window.location.href='/upload'">닫기</button>
+        </div>
+      </body>
+      </html>
     `);
-  } catch (err) {
-    console.error("❌ 백업 폴더를 읽는 중 오류 발생:", err);
-    res.status(500).send("서버 내부 오류 발생");
-  }
-};
+  });
+});
 
-// 백업 파일 다운로드
+// ✅ 개별 백업 파일 다운로드
 router.get("/download", (req, res) => {
-  const { file, user } = req.query;
-  const filePath = path.join(BACKUP_FOLDER, file);
-  if (!fs.existsSync(filePath)) return res.status(404).send("파일이 존재하지 않습니다.");
+  const { path: filePath } = req.query;
+  const remoteFilePath = `${BACKUP_FOLDER}/${filePath}`;
+  const localTempPath = `/tmp/${path.basename(filePath)}`;
+  const user = req.session.user || "Unknown";
+  const timestamp = moment().tz("Asia/Seoul").format("YYYY-MM-DD HH:mm:ss");
 
-  // 로그 파일에 접속 기록 추가
-  const logEntry = `${new Date().toISOString()} - 사용자: ${user} - 다운로드 파일: ${file}\n`;
-  fs.appendFileSync(LOG_FILE, logEntry);
 
-  // Slack 알림 전송
-  const slackMessage = {
-    text: ` *env_backupfile 다운로드 감지*\n 사용자: ${user}\n 파일명: ${file}\n 시간: ${new Date().toLocaleString()}`
-  };
+  const scpCommand = `scp -i ${SSH_KEY} ${REMOTE_USER}@${JENKINS_SERVER}:${remoteFilePath} ${localTempPath}`;
 
-  axios.post(SLACK_WEBHOOK_URL, slackMessage)
-    .then(() => console.log(" Slack 알림 전송 완료"))
-    .catch(err => console.error(" Slack 알림 전송 실패:", err));
+  exec(scpCommand, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`🚨 파일 다운로드 실패: ${stderr}`);
+      return res.status(500).send("파일을 가져오는 중 오류가 발생했습니다.");
+    }
 
-  res.download(filePath);
-});
+    console.log("✅ 파일 다운로드 성공:", localTempPath);
+    const logEntry = `${timestamp} | ${user} | ${filePath}\n`;
+    fs.appendFileSync(DOWNLOAD_LOG, logEntry, "utf8");
 
-// 세션 만료 페이지
-router.get("/session-expired", (req, res) => {
-  res.send(`
-    <h2>세션 만료</h2>
-    <p>세션이 만료되었습니다. 다시 로그인해 주세요.</p>
-    <a href="/login">로그인 페이지로 가기</a>
-  `);
-});
-
-// 로그인 페이지
-router.get("/login", (req, res) => {
-  res.send(`
-    <h2>로그인 페이지</h2>
-    <p>다시 로그인하세요.</p>
-    <form action="/backupfile/verify" method="POST">
-      <label for="username">사용자 이름:</label>
-      <input type="text" id="username" name="username" required>
-      <label for="password">패스워드를 입력하세요:</label>
-      <input type="password" id="password" name="password" required>
-      <label for="otp">OTP:</label>
-      <input type="text" id="otp" name="otp" required>
-      <button type="submit">확인</button>
-    </form>
-  `);
+    res.download(localTempPath, (err) => {
+      if (err) {
+        console.error("🚨 파일 전송 오류:", err);
+        res.status(500).send("파일 전송 중 오류 발생");
+      }
+      exec(`rm -f ${localTempPath}`);
+    });
+  });
 });
 
 module.exports = router;
